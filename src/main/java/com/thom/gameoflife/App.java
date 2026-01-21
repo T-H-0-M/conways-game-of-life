@@ -19,12 +19,13 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        int rows = 1000;
-        int cols = 1000;
-        int cellSize = 2;
+        int rows = 200;
+        int cols = 200;
+        int cellSize = 4;
         model = new GameOfLife(rows, cols);
         view = new LifeRenderer(rows, cols, cellSize);
-        seed();
+        // seed();
+        seedKiteClusters();
         view.render(model);
         Button playPause = new Button("Play");
         Button step = new Button("Step");
@@ -74,9 +75,75 @@ public class App extends Application {
         model.setCell(topRow + 2, leftCol + 2, model.ALIVE);
     }
 
+    private void setAliveWrapped(int row, int col) {
+        int rr = Math.floorMod(row, model.getRows());
+        int cc = Math.floorMod(col, model.getColumns());
+        model.setCell(rr, cc, model.ALIVE);
+    }
+
+    private void seedGosperGliderGun(int topRow, int leftCol, boolean flipHorizontally) {
+        // Bounding box is 36x9 (x: 0..35, y: 0..8). Shoots gliders to the right.
+        final int width = 36;
+        final int height = 9;
+
+        // Coordinates are (x, y) in the canonical orientation.
+        final int[][] cells = new int[][] {
+                { 0, 4 }, { 0, 5 }, { 1, 4 }, { 1, 5 },
+                { 10, 4 }, { 10, 5 }, { 10, 6 },
+                { 11, 3 }, { 11, 7 },
+                { 12, 2 }, { 12, 8 },
+                { 13, 2 }, { 13, 8 },
+                { 14, 5 },
+                { 15, 3 }, { 15, 7 },
+                { 16, 4 }, { 16, 5 }, { 16, 6 },
+                { 17, 5 },
+                { 20, 2 }, { 20, 3 }, { 20, 4 },
+                { 21, 2 }, { 21, 3 }, { 21, 4 },
+                { 22, 1 }, { 22, 5 },
+                { 24, 0 }, { 24, 1 }, { 24, 5 }, { 24, 6 },
+                { 34, 2 }, { 34, 3 },
+                { 35, 2 }, { 35, 3 },
+        };
+
+        for (int[] cell : cells) {
+            int x = cell[0];
+            int y = cell[1];
+            int xx = flipHorizontally ? (width - 1 - x) : x;
+            setAliveWrapped(topRow + y, leftCol + xx);
+        }
+    }
+
+    private void seedKiteClusters() {
+        // A few glider-gun clusters. The emitted gliders tend to look like little
+        // kites.
+        model.clear();
+
+        int rows = model.getRows();
+        int cols = model.getColumns();
+
+        final int gunWidth = 36;
+        final int gunHeight = 9;
+
+        // Keep guns away from edges to avoid immediate wrap-around interactions.
+        int left = Math.max(20, cols / 10);
+        int right = Math.max(0, cols - Math.max(20, cols / 10) - gunWidth);
+
+        int topA = Math.max(20, rows / 3);
+        int topB = Math.max(20, (rows * 2) / 3);
+        int topC = Math.max(20, rows / 2);
+
+        // Two guns shooting to the right.
+        seedGosperGliderGun(topA, left, false);
+        seedGosperGliderGun(topB, left, false);
+
+        // One gun shooting back to the left (mirrored), to create collisions mid-field.
+        seedGosperGliderGun(Math.max(20, topC - gunHeight / 2), right, true);
+    }
+
     private void seed() {
         model.clear();
         // seedGlider(0, 0);
+        // seedKiteClusters();
 
         int rows = model.getRows();
         int cols = model.getColumns();
