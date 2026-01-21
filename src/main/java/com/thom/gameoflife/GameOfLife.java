@@ -64,6 +64,22 @@ public class GameOfLife {
         return currentBoard[row][col];
     }
 
+    public void toggleCell(int row, int col) {
+        if (currentBoard[row][col] == ALIVE) {
+            currentBoard[row][col] = DEAD;
+            return;
+        }
+        currentBoard[row][col] = ALIVE;
+    }
+
+    public int getColumns() {
+        return columns;
+    }
+
+    public int getRows() {
+        return rows;
+    }
+
     public void printGrid() {
         for (int i = 0; i < this.rows; i++) {
             for (int j = 0; j < this.columns; j++) {
