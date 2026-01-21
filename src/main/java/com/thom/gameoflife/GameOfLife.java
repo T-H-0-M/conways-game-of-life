@@ -60,6 +60,14 @@ public class GameOfLife {
         currentBoard[row][col] = value;
     }
 
+    public void clear() {
+        for (int i = 0; i < this.rows; i++) {
+            for (int j = 0; j < this.columns; j++) {
+                currentBoard[i][j] = DEAD;
+            }
+        }
+    }
+
     public byte getCell(int row, int col) {
         return currentBoard[row][col];
     }

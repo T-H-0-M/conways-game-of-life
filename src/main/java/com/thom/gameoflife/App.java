@@ -9,6 +9,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import javafx.animation.KeyFrame;
+import java.util.Random;
 
 public class App extends Application {
     private GameOfLife model;
@@ -18,9 +19,9 @@ public class App extends Application {
 
     @Override
     public void start(Stage stage) {
-        int rows = 60;
-        int cols = 80;
-        int cellSize = 10;
+        int rows = 1000;
+        int cols = 1000;
+        int cellSize = 2;
         model = new GameOfLife(rows, cols);
         view = new LifeRenderer(rows, cols, cellSize);
         seed();
@@ -40,7 +41,7 @@ public class App extends Application {
                 view.render(model);
             }
         });
-        timeline = new Timeline(new KeyFrame(Duration.millis(120), e -> {
+        timeline = new Timeline(new KeyFrame(Duration.millis(16), e -> {
             model.step();
             view.render(model);
         }));
@@ -50,8 +51,8 @@ public class App extends Application {
         Scene scene = new Scene(root);
         stage.setTitle("Conway's Game of Life");
         stage.setScene(scene);
-        stage.sizeToScene();
         stage.show();
+        stage.sizeToScene();
     }
 
     private void toggleRun(Button playPause) {
@@ -65,12 +66,45 @@ public class App extends Application {
         }
     }
 
+    private void seedGlider(int topRow, int leftCol) {
+        model.setCell(topRow + 0, leftCol + 1, model.ALIVE);
+        model.setCell(topRow + 1, leftCol + 2, model.ALIVE);
+        model.setCell(topRow + 2, leftCol + 0, model.ALIVE);
+        model.setCell(topRow + 2, leftCol + 1, model.ALIVE);
+        model.setCell(topRow + 2, leftCol + 2, model.ALIVE);
+    }
+
     private void seed() {
-        model.setCell(1, 2, model.ALIVE);
-        model.setCell(2, 3, model.ALIVE);
-        model.setCell(3, 1, model.ALIVE);
-        model.setCell(3, 2, model.ALIVE);
-        model.setCell(3, 3, model.ALIVE);
+        model.clear();
+        // seedGlider(0, 0);
+
+        int rows = model.getRows();
+        int cols = model.getColumns();
+        Random rng = new Random(); // or new Random(1234) for repeatable runs
+        int clusterCount = Math.max(3, (rows * cols) / 500); // ~9 clusters for 60x80
+        int minRadius = 2;
+        int maxRadius = 7;
+        double baseDensity = 0.75; // higher = denser clusters
+        for (int k = 0; k < clusterCount; k++) {
+            int cr = rng.nextInt(rows);
+            int cc = rng.nextInt(cols);
+            int radius = rng.nextInt(maxRadius - minRadius + 1) + minRadius;
+            for (int r = cr - radius; r <= cr + radius; r++) {
+                for (int c = cc - radius; c <= cc + radius; c++) {
+                    double d = Math.hypot(r - cr, c - cc);
+                    if (d > radius)
+                        continue;
+                    // falloff: center is dense, edges sparse
+                    double p = baseDensity * (1.0 - (d / (radius + 1.0)));
+                    if (rng.nextDouble() < p) {
+                        int rr = Math.floorMod(r, rows);
+                        int cc2 = Math.floorMod(c, cols);
+                        model.setCell(rr, cc2, model.ALIVE);
+                    }
+                }
+            }
+        }
+
     }
 
     public static void main(String[] args) {
