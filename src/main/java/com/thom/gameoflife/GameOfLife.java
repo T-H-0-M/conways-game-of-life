@@ -1,12 +1,9 @@
 package com.thom.gameoflife;
 
-import java.lang.Runnable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
 
-// public class GameOfLife implements Runnable {
 public class GameOfLife {
     public final byte ALIVE = 1;
     public final byte DEAD = 0;
@@ -17,17 +14,18 @@ public class GameOfLife {
     private byte[][] nextBoard;
     private ExecutorService gameEngine;
     private CyclicBarrier barrier;
+    private int numThreads;
 
     public GameOfLife(int rows, int columns) {
         this.rows = rows;
         this.columns = columns;
         this.currentBoard = new byte[rows][columns];
         this.nextBoard = new byte[rows][columns];
-        // TODO: make this dynamic based on board size?
-        this.gameEngine = Executors.newFixedThreadPool(10);
-        // INFO: this needs to be 11, always account for the main thread or it will eat
-        // your lunch
-        this.barrier = new CyclicBarrier(11);
+        this.numThreads = Runtime.getRuntime().availableProcessors();
+        this.gameEngine = Executors.newFixedThreadPool(this.numThreads);
+        // INFO: this needs to be expected threads + 1, always account for the main
+        // thread or it will eat your lunch
+        this.barrier = new CyclicBarrier(this.numThreads + 1);
     }
 
     public int countActiveNeighbors(int row, int col) {
@@ -46,17 +44,14 @@ public class GameOfLife {
         return activeNeighbors;
     }
 
-    // @Override
-    // public void run() {
-    //
-    // }
-
     public void step() {
-        // TODO: make this block instead of col
         // INFO: start col is inclusive
-        for (int i = 0; i < 10; ++i) {
-            final int startCol = i * 100;
-            final int endCol = startCol + 100;
+
+        int chunk = Math.round(this.columns / this.numThreads);
+        for (int i = 0; i < this.numThreads; ++i) {
+
+            final int startCol = i * chunk;
+            final int endCol = i == this.numThreads ? this.columns : startCol + chunk;
             final int threadNum = i;
 
             // just my personal memo - execute returns void, submit returns Future<T>
