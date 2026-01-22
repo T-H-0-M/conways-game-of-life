@@ -49,15 +49,12 @@ public class GameOfLife {
 
         int chunk = Math.round(this.columns / this.numThreads);
         for (int i = 0; i < this.numThreads; ++i) {
-
             final int startCol = i * chunk;
             final int endCol = i == this.numThreads ? this.columns : startCol + chunk;
-            final int threadNum = i;
 
             // just my personal memo - execute returns void, submit returns Future<T>
             gameEngine.execute(() -> {
                 try {
-                    System.out.println("thread " + threadNum);
                     for (int x = startCol; x < endCol; x++) {
                         for (int y = 0; y < this.columns; y++) {
                             int activeNeighbors = countActiveNeighbors(x, y);

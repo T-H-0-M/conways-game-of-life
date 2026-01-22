@@ -5,6 +5,8 @@ import javafx.application.Application;
 import javafx.stage.Stage;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.collections.FXCollections;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
@@ -12,6 +14,68 @@ import javafx.animation.KeyFrame;
 import java.util.Random;
 
 public class App extends Application {
+    private record Preset(String label, Runnable seed) {
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    private static final String[] SNARK_VARIANTS = new String[] {
+            ".............................OO....................",
+            "............................O.O....................",
+            "......................OO....O......................",
+            "....................O..O..OO.OOOO..................",
+            "....................OO.O.O.O.O..O..................",
+            ".......................O.O.O.O.....................",
+            ".......................O.O.OO......................",
+            "........................O..........................",
+            "...................................................",
+            ".....................................OO............",
+            "............................OO.......O.............",
+            "............................OO.....O.O.............",
+            ".........O.........................OO..............",
+            ".........OOO.......................................",
+            "............O........O.............................",
+            "...........OO.......O..............................",
+            "....................OOO............................",
+            "...................................................",
+            "...OO..............................................",
+            "...O.....................OO........................",
+            "OO.O......................O........................",
+            "O..OOO....OO...........OOO.........................",
+            ".OO...O...OO...........O......................O....",
+            "...OOOO.....................OO..............OOOOO..",
+            "...O...............OO........O.............O.....O.",
+            "....OOO............O.O.......O.O............OOO..O.",
+            ".......O.............O........OO...............O.OO",
+            "..OOOOO..............OO.....................OOOO..O",
+            ".O..O......................O...........OO...O...OO.",
+            ".OO......................OOO...........OO....OOO...",
+            "........................O......................O...",
+            "........................OO.....................O.OO",
+            "..............................................OO.OO",
+            "...................................................",
+            "...................................................",
+            "......................................OO...........",
+            "......................................O............",
+            ".......................................OOO.........",
+            "..............OO.........................O.........",
+            ".............O.O.....OO............................",
+            ".............O.......OO............................",
+            "............OO.....................................",
+            "...................................................",
+            "..........................O........................",
+            "................OO....OO.O.O.......................",
+            "...............O..O..O.O.O.O.......................",
+            "................OO...O.O.O.OO......................",
+            "..................OOOO.OO..O.......................",
+            "..................O...O....O.......................",
+            "...................O..O.OOO........................",
+            "....................O.O.O..........................",
+            ".....................O.............................",
+    };
+
     private GameOfLife model;
     private LifeRenderer view;
     private Timeline timeline;
@@ -24,14 +88,35 @@ public class App extends Application {
         int cellSize = 4;
         model = new GameOfLife(rows, cols);
         view = new LifeRenderer(rows, cols, cellSize);
-        // seed();
-        seedKiteClusters();
+
+        ComboBox<Preset> presetBox = new ComboBox<>(FXCollections.observableArrayList(
+                new Preset("Random Seed", this::randomSeed),
+                new Preset("Kite Clusters", this::seedKiteClusters),
+                new Preset("Gemini", this::seedGemini),
+                new Preset("Spaceship Takeoff", this::seedSpaceshipTakeoff),
+                new Preset("Snark", this::seedSnark)));
+        presetBox.getSelectionModel().select(1);
+
+        Preset initialPreset = presetBox.getValue();
+        if (initialPreset != null) {
+            initialPreset.seed().run();
+        }
         view.render(model);
+
         Button playPause = new Button("Play");
         Button step = new Button("Step");
+        Button reset = new Button("Reset");
         playPause.setOnAction(e -> toggleRun(playPause));
         step.setOnAction(e -> {
             model.step();
+            view.render(model);
+        });
+        reset.setOnAction(e -> {
+            pause(playPause);
+            Preset selectedPreset = presetBox.getValue();
+            if (selectedPreset != null) {
+                selectedPreset.seed().run();
+            }
             view.render(model);
         });
         view.getCanvas().setOnMouseClicked(e -> {
@@ -47,7 +132,7 @@ public class App extends Application {
             view.render(model);
         }));
         timeline.setCycleCount(Timeline.INDEFINITE);
-        HBox controls = new HBox(10, playPause, step);
+        HBox controls = new HBox(20, playPause, step, reset, presetBox);
         VBox root = new VBox(10, controls, view.getCanvas());
         Scene scene = new Scene(root);
         stage.setTitle("Conway's Game of Life");
@@ -67,6 +152,12 @@ public class App extends Application {
         }
     }
 
+    private void pause(Button playPause) {
+        isRunning = false;
+        timeline.pause();
+        playPause.setText("Play");
+    }
+
     private void seedGlider(int topRow, int leftCol) {
         model.setCell(topRow + 0, leftCol + 1, model.ALIVE);
         model.setCell(topRow + 1, leftCol + 2, model.ALIVE);
@@ -82,11 +173,9 @@ public class App extends Application {
     }
 
     private void seedGosperGliderGun(int topRow, int leftCol, boolean flipHorizontally) {
-        // Bounding box is 36x9 (x: 0..35, y: 0..8). Shoots gliders to the right.
         final int width = 36;
         final int height = 9;
 
-        // Coordinates are (x, y) in the canonical orientation.
         final int[][] cells = new int[][] {
                 { 0, 4 }, { 0, 5 }, { 1, 4 }, { 1, 5 },
                 { 10, 4 }, { 10, 5 }, { 10, 6 },
@@ -114,8 +203,23 @@ public class App extends Application {
     }
 
     private void seedKiteClusters() {
-        // A few glider-gun clusters. The emitted gliders tend to look like little
-        // kites.
+        model.clear();
+        int rows = model.getRows();
+        int cols = model.getColumns();
+        final int gunWidth = 36;
+        final int gunHeight = 9;
+        int left = Math.max(20, cols / 10);
+        int right = Math.max(0, cols - Math.max(20, cols / 10) - gunWidth);
+        int topA = Math.max(20, rows / 3);
+        int topB = Math.max(20, (rows * 2) / 3);
+        int topC = Math.max(20, rows / 2);
+        seedGosperGliderGun(topA, left, false);
+        seedGosperGliderGun(topB, left, false);
+        seedGosperGliderGun(Math.max(20, topC - gunHeight / 2), right, true);
+    }
+
+    private void seedGemini() {
+        // Two mirrored Gosper glider guns ("twins") shooting toward each other.
         model.clear();
 
         int rows = model.getRows();
@@ -124,27 +228,71 @@ public class App extends Application {
         final int gunWidth = 36;
         final int gunHeight = 9;
 
-        // Keep guns away from edges to avoid immediate wrap-around interactions.
-        int left = Math.max(20, cols / 10);
-        int right = Math.max(0, cols - Math.max(20, cols / 10) - gunWidth);
+        int margin = Math.max(20, cols / 10);
+        int left = margin;
+        int right = Math.max(0, cols - margin - gunWidth);
 
-        int topA = Math.max(20, rows / 3);
-        int topB = Math.max(20, (rows * 2) / 3);
-        int topC = Math.max(20, rows / 2);
+        int top = Math.max(20, (rows / 2) - (gunHeight / 2));
 
-        // Two guns shooting to the right.
-        seedGosperGliderGun(topA, left, false);
-        seedGosperGliderGun(topB, left, false);
-
-        // One gun shooting back to the left (mirrored), to create collisions mid-field.
-        seedGosperGliderGun(Math.max(20, topC - gunHeight / 2), right, true);
+        seedGosperGliderGun(top, left, false);
+        seedGosperGliderGun(top, right, true);
     }
 
-    private void seed() {
+    private void seedSpaceshipTakeoff() {
         model.clear();
-        // seedGlider(0, 0);
-        // seedKiteClusters();
 
+        int rows = model.getRows();
+        int cols = model.getColumns();
+
+        int top = Math.max(10, (rows / 2) - 2);
+        int left = Math.max(10, (cols / 2) - 4);
+        seedDiehard(top, left);
+    }
+
+    private void seedDiehard(int topRow, int leftCol) {
+        final int[][] cells = new int[][] {
+                { 6, 0 },
+                { 0, 1 }, { 1, 1 },
+                { 1, 2 }, { 5, 2 }, { 6, 2 }, { 7, 2 },
+        };
+
+        for (int[] cell : cells) {
+            int x = cell[0];
+            int y = cell[1];
+            setAliveWrapped(topRow + y, leftCol + x);
+        }
+    }
+
+    private void seedSnark() {
+        model.clear();
+
+        int rows = model.getRows();
+        int cols = model.getColumns();
+
+        int patternHeight = SNARK_VARIANTS.length;
+        int patternWidth = 0;
+        for (String line : SNARK_VARIANTS) {
+            patternWidth = Math.max(patternWidth, line.length());
+        }
+
+        int top = Math.max(0, (rows - patternHeight) / 2);
+        int left = Math.max(0, (cols - patternWidth) / 2);
+        seedFromAscii(top, left, SNARK_VARIANTS);
+    }
+
+    private void seedFromAscii(int topRow, int leftCol, String[] lines) {
+        for (int y = 0; y < lines.length; y++) {
+            String line = lines[y];
+            for (int x = 0; x < line.length(); x++) {
+                if (line.charAt(x) == 'O') {
+                    setAliveWrapped(topRow + y, leftCol + x);
+                }
+            }
+        }
+    }
+
+    private void randomSeed() {
+        model.clear();
         int rows = model.getRows();
         int cols = model.getColumns();
         Random rng = new Random(); // or new Random(1234) for repeatable runs
